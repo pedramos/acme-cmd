@@ -20,6 +20,9 @@ var defaultDir = fmt.Sprintf("%s/lib/coms/", HOME)
 var sshDir = flag.String("d", defaultDir, "Directory contianing all the ssh connection description")
 
 func main() {
+	if !fs.ValidPath(*sshDir) {
+		log.Fatalf("Path %s does not exist", *sshDir)
+	}
 	w, _ := acme.New()
 	w.Name("/ssh/+list")
 	w.Fprintf("tag", "Get Dial Info Add Rm")
@@ -29,8 +32,8 @@ func main() {
 	w.Ctl("clean")
 	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			w.Write("body", []byte(err.Error()))
-			log.Fatal(err)
+			w.Fprintf("body", "Error on %s: %v\n", path, err)
+			w.Ctl("clean")
 		}
 		if d.IsDir() {
 			dir = d.Name()
