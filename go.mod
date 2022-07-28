@@ -1,4 +1,4 @@
-module pedrolorgaramos.win/d/acme-utils
+module pedrolorgaramos.win/s/acme-utils
 
 go 1.18
 
