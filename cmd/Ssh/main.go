@@ -53,14 +53,27 @@ func main() {
 				continue
 			}
 			if string(e.Text) == "Dial" {
-				sshDescription := strings.TrimSpace(w.Selection())
+				sshConfig := strings.TrimSpace(w.Selection())
 				w.Del(true)
-				f, err := fileSystem.Open(sshDescription)
+				f, err := fileSystem.Open(sshConfig)
 				if err != nil {
-					w.Fprintf("body", "Cannot open %s: %v\n", sshDescription, err)
+					w.Fprintf("body", "Cannot open %s: %v\n", sshConfig, err)
 					w.Ctl("clean")
 				}
 				sshWin(f)
+			}
+			if string(e.Text) == "Del" {
+				w.Del(true)
+				os.Exit(0)
+			}
+			if string(e.Text) == "Info" {
+				sshConfig := strings.TrimSpace(w.Selection())
+				f, err := fileSystem.Open(sshConfig)
+				if err != nil {
+					w.Fprintf("body", "Cannot open %s: %v\n", sshConfig, err)
+					w.Ctl("clean")
+				}
+				displayInfo(f, sshConfig)
 			}
 		}
 	}
@@ -108,4 +121,20 @@ func sshWin(r io.Reader) {
 	}
 	c := exec.Command("win", sshCmd...)
 	c.Start()
+}
+
+func displayInfo(f fs.File, path string) error {
+	w, _ := acme.New()
+	w.Name(fmt.Sprintf("/ssh/%s/+info", path ))
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) == "--end--" {
+			break
+		}
+		w.Write("body", scanner.Bytes())
+		w.Write("body", []byte("\n"))
+	}
+	w.Ctl("clean")
+	return nil
 }
