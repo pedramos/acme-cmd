@@ -37,7 +37,7 @@ func main() {
 			w.Ctl("clean")
 		}
 		if d.IsDir() {
-			dir = d.Name()
+			dir = path
 			return nil
 		}
 		w.Fprintf("body", "%s/%s\n", dir, d.Name())
