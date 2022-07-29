@@ -20,7 +20,7 @@ func usage() {
 }
 
 var HOME = os.Getenv("HOME")
-var defaultDir = fmt.Sprintf("%s/lib/coms/", HOME)
+var defaultDir = fmt.Sprintf("%s/lib/coms/ssh", HOME)
 var sshDir = flag.String("d", defaultDir, "Directory contianing all the ssh connection description")
 
 func main() {
@@ -106,6 +106,6 @@ func sshWin(r io.Reader) {
 	if !password {
 		sshCmd = append(sshCmd, "-i", key)
 	}
-	c:= exec.Command("win", sshCmd...)
+	c := exec.Command("win", sshCmd...)
 	c.Start()
 }
