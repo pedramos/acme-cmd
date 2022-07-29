@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -47,20 +46,13 @@ func main() {
 
 	for e := range w.EventChan() {
 		switch e.C2 {
-		case 'x', 'X': // execute
+		case 'x': // execute in tag
 			// Get Dial Info Add Rm
 			if string(e.Text) == "Get" {
 				continue
 			}
 			if string(e.Text) == "Dial" {
-				sshConfig := strings.TrimSpace(w.Selection())
-				w.Del(true)
-				f, err := fileSystem.Open(sshConfig)
-				if err != nil {
-					w.Fprintf("body", "Cannot open %s: %v\n", sshConfig, err)
-					w.Ctl("clean")
-				}
-				sshWin(f)
+				dial(w, e, fileSystem)
 			}
 			if string(e.Text) == "Del" {
 				w.Del(true)
@@ -75,12 +67,21 @@ func main() {
 				}
 				displayInfo(f, sshConfig)
 			}
+		case 'X': // executes in body
+			dial(w, e, fileSystem)
 		}
 	}
 }
 
-func sshWin(r io.Reader) {
-	scanner := bufio.NewScanner(r)
+func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
+	sshConfig := strings.TrimSpace(string(e.Text))
+	w.Del(true)
+	f, err := fileSystem.Open(sshConfig)
+	if err != nil {
+		w.Fprintf("body", "Cannot open %s: %v\n", sshConfig, err)
+		w.Ctl("clean")
+	}
+	scanner := bufio.NewScanner(f)
 	var b strings.Builder
 	for scanner.Scan() {
 		if strings.TrimSpace(scanner.Text()) == "--end--" {
@@ -125,7 +126,7 @@ func sshWin(r io.Reader) {
 
 func displayInfo(f fs.File, path string) error {
 	w, _ := acme.New()
-	w.Name(fmt.Sprintf("/ssh/%s/+info", path ))
+	w.Name(fmt.Sprintf("/ssh/%s/+info", path))
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
