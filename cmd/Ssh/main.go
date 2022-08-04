@@ -114,9 +114,8 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	}
 	if host == "" || (!password && key == "") || user == "" {
 		log.Fatalf("Bad ssh descriptor:\nhost: %s\npassword:%v\nuser:%s", host, password, user)
-	}
-	var sshCmd []string
-	sshCmd = append(sshCmd, "ssh", host, "-l", user)
+	} 
+	var sshCmd []string = []string{"ssh", host,"-l","user"}
 	if !password {
 		sshCmd = append(sshCmd, "-i", key)
 	}
