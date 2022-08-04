@@ -41,7 +41,11 @@ func main() {
 			dir = path
 			return nil
 		}
-		w.Fprintf("body", "%s/%s\n", dir, d.Name())
+		if dir != "." {	
+			w.Fprintf("body", "%s/%s\n", dir, d.Name())
+		} else {
+			w.Fprintf("body", "%s\n", d.Name())
+		}
 		return nil
 	})
 	w.Ctl("clean")
