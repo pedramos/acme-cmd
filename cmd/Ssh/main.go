@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -114,13 +116,35 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	}
 	if host == "" || (!password && key == "") || user == "" {
 		log.Fatalf("Bad ssh descriptor:\nhost: %s\npassword:%v\nuser:%s", host, password, user)
-	} 
-	var sshCmd []string = []string{"ssh", host,"-l","user"}
+	}
+	var sshCmd []string = []string{"ssh", host, "-l", user}
 	if !password {
 		sshCmd = append(sshCmd, "-i", key)
 	}
 	c := exec.Command("win", sshCmd...)
 	c.Start()
+
+	mntPoint := fmt.Sprintf("%s/n/%s", HOME, e.Text)
+	os.MkdirAll(mntPoint, 0770)
+	fsCmdArgs := []string{
+		"-C",
+		"-o",
+		fmt.Sprintf("IdentityFile=%s", key),
+		fmt.Sprintf("%s@%s:", user, host),
+		mntPoint,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	sshFS := exec.CommandContext(ctx, "sshfs", fsCmdArgs...)
+	stderr, _ := sshFS.StderrPipe()
+	go io.Copy(os.Stderr, stderr)
+	if err := sshFS.Start(); err != nil {
+		log.Printf("Could not mount sshfs: %v", err)
+	}
+	sshDirWin, _ := acme.New()
+	sshDirWin.Name(mntPoint)
+	sshDirWin.Ctl("get")
+	c.Wait()
+	cancel()
 }
 
 func displayInfo(f fs.File, path string) error {
