@@ -30,19 +30,17 @@ func main() {
 	w.Fprintf("tag", "Get Dial Info Add Rm")
 
 	fileSystem := os.DirFS(*sshDir)
-	var dir string
 	w.Ctl("clean")
 	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			w.Fprintf("body", "Error on %s: %v\n", path, err)
 			w.Ctl("clean")
 		}
-		if d.IsDir() {
-			dir = path
+ 		if d.IsDir() {
 			return nil
 		}
-		if dir != "." {	
-			w.Fprintf("body", "%s/%s\n", dir, d.Name())
+		if path != "." {	
+			w.Fprintf("body", "%s\n", path)
 		} else {
 			w.Fprintf("body", "%s\n", d.Name())
 		}
