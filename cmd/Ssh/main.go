@@ -27,26 +27,9 @@ var sshDir = flag.String("d", defaultDir, "Directory contianing all the ssh conn
 func main() {
 	w, _ := acme.New()
 	w.Name("/ssh/+list")
-	w.Fprintf("tag", "Get Dial Info Add Rm")
-
+	w.Fprintf("tag", "Get Dial Info Add")
 	fileSystem := os.DirFS(*sshDir)
-	w.Ctl("clean")
-	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			w.Fprintf("body", "Error on %s: %v\n", path, err)
-			w.Ctl("clean")
-		}
- 		if d.IsDir() {
-			return nil
-		}
-		if path != "." {	
-			w.Fprintf("body", "%s\n", path)
-		} else {
-			w.Fprintf("body", "%s\n", d.Name())
-		}
-		return nil
-	})
-	w.Ctl("clean")
+	writeSshEntries(w, fileSystem)
 
 	for e := range w.EventChan() {
 		switch e.C2 {
@@ -71,10 +54,47 @@ func main() {
 				}
 				displayInfo(f, sshConfig)
 			}
+			if string(e.Text) == "Add" {
+				createEntry()
+			}
 		case 'X': // executes in body
 			dial(w, e, fileSystem)
 		}
 	}
+}
+
+func createEntry() {
+	w, _ := acme.New()
+	winName := fmt.Sprintf("%s/", *sshDir)
+	w.Name(winName)
+	w.Write("body", []byte(`
+--end--
+host
+username
+key
+password
+`))
+	w.Ctl("clean")
+}
+
+func writeSshEntries(w *acme.Win, fileSystem fs.FS) {
+
+	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			w.Fprintf("body", "Error on %s: %v\n", path, err)
+			w.Ctl("clean")
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if path != "." {
+			w.Fprintf("body", "%s\n", path)
+		} else {
+			w.Fprintf("body", "%s\n", d.Name())
+		}
+		return nil
+	})
+	w.Ctl("clean")
 }
 
 func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
