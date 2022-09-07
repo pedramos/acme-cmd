@@ -1,3 +1,18 @@
+// Ssh cmd is meant to be used inside acme. It manages ssh connections to other systems.
+// Each connection must be described in a configuration file with the following template:
+// 	
+// 	Info about server
+// 	blah blah
+// 	--end--
+// 	
+// 	host <ip|fqdn>
+// 	user <user>
+// 	password 
+// 	key <path to keyfile>
+// 
+// Only one of key or password is needed. Password is simply a flag to indicate that the password should be asked.
+//
+// By default the files will be located in $home/lib/coms/ssh
 package main
 
 import (
@@ -104,42 +119,6 @@ func writeSshEntries(w *acme.Win, fileSystem fs.FS) {
 	w.Ctl("clean")
 }
 
-func parseConfig(f io.Reader) (Server, error) {
-	scanner := bufio.NewScanner(f)
-	var b strings.Builder
-	for scanner.Scan() {
-		if strings.TrimSpace(scanner.Text()) == "--end--" {
-			break
-		}
-		b.WriteString(scanner.Text())
-		b.WriteRune('\n')
-	}
-
-	var s Server
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		f := strings.Fields(line)
-		switch f[0] {
-		case "host":
-			s.host = f[1]
-		case "user":
-			s.user = f[1]
-		case "password":
-			s.password = true
-		case "key":
-			s.key = f[1]
-		}
-	}
-	if s.host == "" || (!s.password && s.key == "") || s.user == "" {
-		return s, fmt.Errorf("Bad ssh descriptor:\nhost: %s\npassword:%v\nuser:%s", s.host, s.password, s.user)
-	}
-	return s, nil
-}
-
 func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	sshConfig := strings.TrimSpace(string(e.Text))
 	w.Del(true)
@@ -209,4 +188,40 @@ func sshFS(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	sshDirWin, _ := acme.New()
 	sshDirWin.Name(mntPoint)
 	sshDirWin.Ctl("get")
+}
+
+func parseConfig(f io.Reader) (Server, error) {
+	scanner := bufio.NewScanner(f)
+	var b strings.Builder
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) == "--end--" {
+			break
+		}
+		b.WriteString(scanner.Text())
+		b.WriteRune('\n')
+	}
+
+	var s Server
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		f := strings.Fields(line)
+		switch f[0] {
+		case "host":
+			s.host = f[1]
+		case "user":
+			s.user = f[1]
+		case "password":
+			s.password = true
+		case "key":
+			s.key = f[1]
+		}
+	}
+	if s.host == "" || (!s.password && s.key == "") || s.user == "" {
+		return s, fmt.Errorf("Bad ssh descriptor:\nhost: %s\npassword:%v\nuser:%s", s.host, s.password, s.user)
+	}
+	return s, nil
 }
