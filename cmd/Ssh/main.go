@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -24,10 +23,15 @@ var HOME = os.Getenv("HOME")
 var defaultDir = fmt.Sprintf("%s/lib/coms/ssh", HOME)
 var sshDir = flag.String("d", defaultDir, "Directory contianing all the ssh connection description")
 
+type Server struct {
+	host, user, key string
+	password        bool
+}
+
 func main() {
 	w, _ := acme.New()
 	w.Name("/ssh/+list")
-	w.Fprintf("tag", "Get Dial Info Add")
+	w.Fprintf("tag", "Get Dial Info Add Mnt")
 	fileSystem := os.DirFS(*sshDir)
 	writeSshEntries(w, fileSystem)
 
@@ -40,6 +44,9 @@ func main() {
 			}
 			if string(e.Text) == "Dial" {
 				dial(w, e, fileSystem)
+			}
+			if string(e.Text) == "Mnt" {
+				sshFS(w, e, fileSystem)
 			}
 			if string(e.Text) == "Del" {
 				w.Del(true)
@@ -97,14 +104,7 @@ func writeSshEntries(w *acme.Win, fileSystem fs.FS) {
 	w.Ctl("clean")
 }
 
-func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
-	sshConfig := strings.TrimSpace(string(e.Text))
-	w.Del(true)
-	f, err := fileSystem.Open(sshConfig)
-	if err != nil {
-		w.Fprintf("body", "Cannot open %s: %v\n", sshConfig, err)
-		w.Ctl("clean")
-	}
+func parseConfig(f io.Reader) (Server, error) {
 	scanner := bufio.NewScanner(f)
 	var b strings.Builder
 	for scanner.Scan() {
@@ -115,10 +115,8 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 		b.WriteRune('\n')
 	}
 
-	var (
-		host, user, key string
-		password        bool
-	)
+	var s Server
+
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
@@ -127,46 +125,41 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 		f := strings.Fields(line)
 		switch f[0] {
 		case "host":
-			host = f[1]
+			s.host = f[1]
 		case "user":
-			user = f[1]
+			s.user = f[1]
 		case "password":
-			password = true
+			s.password = true
 		case "key":
-			key = f[1]
+			s.key = f[1]
 		}
 	}
-	if host == "" || (!password && key == "") || user == "" {
-		log.Fatalf("Bad ssh descriptor:\nhost: %s\npassword:%v\nuser:%s", host, password, user)
+	if s.host == "" || (!s.password && s.key == "") || s.user == "" {
+		return s, fmt.Errorf("Bad ssh descriptor:\nhost: %s\npassword:%v\nuser:%s", s.host, s.password, s.user)
 	}
-	var sshCmd []string = []string{"ssh", host, "-l", user}
-	if !password {
-		sshCmd = append(sshCmd, "-i", key)
-	}
-	c := exec.Command("win", sshCmd...)
-	c.Start()
+	return s, nil
+}
 
-	mntPoint := fmt.Sprintf("%s/n/%s", HOME, e.Text)
-	os.MkdirAll(mntPoint, 0770)
-	fsCmdArgs := []string{
-		"-C",
-		"-o",
-		fmt.Sprintf("IdentityFile=%s", key),
-		fmt.Sprintf("%s@%s:", user, host),
-		mntPoint,
+func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
+	sshConfig := strings.TrimSpace(string(e.Text))
+	w.Del(true)
+	f, err := fileSystem.Open(sshConfig)
+	if err != nil {
+		w.Fprintf("body", "Cannot open %s: %v\n", sshConfig, err)
+		w.Ctl("clean")
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	sshFS := exec.CommandContext(ctx, "sshfs", fsCmdArgs...)
-	stderr, _ := sshFS.StderrPipe()
-	go io.Copy(os.Stderr, stderr)
-	if err := sshFS.Start(); err != nil {
-		log.Printf("Could not mount sshfs: %v", err)
+	server, err := parseConfig(f)
+	if err != nil {
+		log.Fatal(err)
 	}
-	sshDirWin, _ := acme.New()
-	sshDirWin.Name(mntPoint)
-	sshDirWin.Ctl("get")
-	c.Wait()
-	cancel()
+
+	var sshCmd []string = []string{"ssh", server.host, "-l", server.user}
+	if !server.password {
+		sshCmd = append(sshCmd, "-i", server.key)
+	}
+	cmd := exec.Command("win", sshCmd...)
+	cmd.Start()
+	cmd.Wait()
 }
 
 func displayInfo(f fs.File, path string) error {
@@ -183,4 +176,37 @@ func displayInfo(f fs.File, path string) error {
 	}
 	w.Ctl("clean")
 	return nil
+}
+
+func sshFS(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
+	sshConfig := strings.TrimSpace(string(w.Selection()))
+	w.Del(true)
+	f, err := fileSystem.Open(sshConfig)
+	if err != nil {
+		w.Fprintf("body", "Cannot open %s: %v\n", sshConfig, err)
+		w.Ctl("clean")
+	}
+	s, err := parseConfig(f)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mntPoint := fmt.Sprintf("%s/n/%s", HOME, e.Text)
+	os.MkdirAll(mntPoint, 0770)
+	fsCmdArgs := []string{
+		"-C",
+		"-o",
+		fmt.Sprintf("IdentityFile=%s", s.key),
+		fmt.Sprintf("%s@%s:", s.user, s.host),
+		mntPoint,
+	}
+	sshFS := exec.Command("sshfs", fsCmdArgs...)
+	stderr, _ := sshFS.StderrPipe()
+	go io.Copy(os.Stderr, stderr)
+	if err := sshFS.Start(); err != nil {
+		log.Printf("Could not mount sshfs: %v", err)
+	}
+	sshDirWin, _ := acme.New()
+	sshDirWin.Name(mntPoint)
+	sshDirWin.Ctl("get")
 }
