@@ -26,7 +26,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"9fans.net/go/acme"
+	"pedrolorgaramos.win/s/9fans-go/acme"
 )
 
 func usage() {
