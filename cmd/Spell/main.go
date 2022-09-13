@@ -19,7 +19,7 @@ func main() {
 		log.Fatalf("Not running in acme")
 	}
 	var docname string
-	if t, err := windoc.ReadAll("tag"); err != nil {
+	if t, err := windoc.ReadAll("tag"); err != nil || t[0] == ' ' {
 		docname = ""
 	} else {
 		docname = strings.Fields(string(t))[0]
