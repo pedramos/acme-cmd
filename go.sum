@@ -49,4 +49,6 @@ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 pedrolorgaramos.win/s/9fans-go v0.0.0-20220910100046-8b43ec0fdc81 h1:AtzwI4DXfe+Fu06633niz8ubHZx3ZZgqvBfAcuVveZ8=
 pedrolorgaramos.win/s/9fans-go v0.0.0-20220910100046-8b43ec0fdc81/go.mod h1:TMrSfj5dTVuTnrrsYiw1x2chiTUfn3ayDiPkjt5iFIQ=
+pedrolorgaramos.win/s/9fans-go v0.0.0-20220912174647-79efb0746874 h1:VXxirjwY7Ob7qIiix6Z4WydT0mBtoNRyr6qbaijdxxo=
+pedrolorgaramos.win/s/9fans-go v0.0.0-20220912174647-79efb0746874/go.mod h1:U5MJ8FxlkWNHKhXS5e/4m2IAsXPk5fxSMGPmF60AL04=
 rsc.io/goversion v1.2.0/go.mod h1:Eih9y/uIBS3ulggl7KNJ09xGSLcuNaLgmvvqa07sgfo=
