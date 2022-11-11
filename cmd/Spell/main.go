@@ -48,7 +48,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not read content: %v", err)
 	}
+
 	r := bytes.NewReader(xdata)
+	windoc, _ = acme.Open(id, nil)
+	if windoc == nil {
+		log.Fatalf("Not running in acme")
+	}
 
 	var (
 		// wq0 and wq1 marks the start and end of the word to be spellchecked
@@ -107,7 +112,7 @@ func spellcheck(w *acme.Win, word string) (fixedWrd string, deltaQ int) {
 	w.Write("data", nil)
 	w.Ctl("clean")
 
- 	speller, err := aspell.NewSpeller(map[string]string{
+	speller, err := aspell.NewSpeller(map[string]string{
 		"lang": "en_US",
 	})
 	if err != nil {
@@ -126,7 +131,7 @@ func spellcheck(w *acme.Win, word string) (fixedWrd string, deltaQ int) {
 	} else {
 		sugglst = speller.Suggest(word)[:5]
 	}
-	
+
 	w.Fprintf("body", "%s\n", strings.Join(sugglst, "\n"))
 	w.Ctl("clean")
 	for e := range w.EventChan() {
@@ -148,7 +153,6 @@ func spellcheck(w *acme.Win, word string) (fixedWrd string, deltaQ int) {
 			fixedWrd = strings.TrimSpace(string(e.Text))
 			deltaQ = len(fixedWrd) - len(word)
 			return
-
 		}
 	}
 	return
