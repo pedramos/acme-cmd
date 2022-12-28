@@ -2,4 +2,8 @@ module pedrolorgaramos.win/go/acme-cmd/Ssh
 
 go 1.19
 
-require pedrolorgaramos.win/s/9fans-go v0.0.0-20220912174647-79efb0746874
+require (
+	golang.org/x/crypto v0.4.0 // indirect
+	golang.org/x/sys v0.3.0 // indirect
+	pedrolorgaramos.win/go/9fans v0.0.0-20221220121134-a4e45fb4ceb9 // indirect
+)

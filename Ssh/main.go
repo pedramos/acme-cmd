@@ -25,9 +25,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
-	"golang.org/x/crypto/ssh"
-	"pedrolorgaramos.win/s/9fans-go/acme"
+	"pedrolorgaramos.win/go/9fans/acme"
 )
 
 func usage() {
@@ -139,23 +139,21 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	}
 	cmd := exec.Command("win", sshCmd...)
 	cmd.Start()
-
-	var (
-		sshwinID   int
-		sshwinName string
-	)
-	for _, winfo := range acme.Windows() {
-		if wininfo.ID > maxid && strings.HasSuffix(wininfo.Name, "-ssh") {
+	time.Sleep(500 * time.Millisecond        )
+	var sshwinID int
+	wins, _ := acme.Windows()
+	for _, winfo := range wins {
+		if winfo.ID > sshwinID && strings.HasSuffix(winfo.Name, "-ssh") {
 			sshwinID = winfo.ID
 
 		}
 	}
-	w, err := acme.Open(sshwinID, nil)
+	w, err = acme.Open(sshwinID, nil)
 	if err != nil {
 		log.Printf("Could not open window with ssh session due to %s", err)
+	} else {
+		w.Name("/ssh/%s", sshConfig)
 	}
-
-	w.Name("/ssh/%s", ssh.Config)
 	cmd.Wait()
 }
 

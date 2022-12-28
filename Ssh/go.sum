@@ -1,2 +1,8 @@
+golang.org/x/crypto v0.4.0 h1:UVQgzMY87xqpKNgb+kDsll2Igd33HszWHFLmpaRMq/8=
+golang.org/x/crypto v0.4.0/go.mod h1:3quD/ATkf6oY+rnes5c3ExXTbLc8mueNue5/DoinL80=
+golang.org/x/sys v0.3.0 h1:w8ZOecv6NaNa/zC8944JTU3vz4u6Lagfk4RPQxv92NQ=
+golang.org/x/sys v0.3.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+pedrolorgaramos.win/go/9fans v0.0.0-20221220121134-a4e45fb4ceb9 h1:VMgtQuK0/FKKGWPLVieW+HPUoPD6gG+DVVpPwrQgQ1Q=
+pedrolorgaramos.win/go/9fans v0.0.0-20221220121134-a4e45fb4ceb9/go.mod h1:qxRaBYDlZo/Lbcdj9iSl8em7mLXkU2ESVfFj+Me+pkA=
 pedrolorgaramos.win/s/9fans-go v0.0.0-20220912174647-79efb0746874 h1:VXxirjwY7Ob7qIiix6Z4WydT0mBtoNRyr6qbaijdxxo=
 pedrolorgaramos.win/s/9fans-go v0.0.0-20220912174647-79efb0746874/go.mod h1:U5MJ8FxlkWNHKhXS5e/4m2IAsXPk5fxSMGPmF60AL04=
