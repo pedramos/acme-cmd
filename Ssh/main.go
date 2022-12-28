@@ -1,15 +1,15 @@
 // Ssh cmd is meant to be used inside acme. It manages ssh connections to other systems.
 // Each connection must be described in a configuration file with the following template:
-// 	
+//
 // 	Info about server
 // 	blah blah
 // 	--end--
-// 	
+//
 // 	host <ip|fqdn>
 // 	user <user>
-// 	password 
+// 	password
 // 	key <path to keyfile>
-// 
+//
 // Only one of key or password is needed. Password is simply a flag to indicate that the password should be asked.
 //
 // By default the files will be located in $home/lib/coms/ssh
@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"golang.org/x/crypto/ssh"
 	"pedrolorgaramos.win/s/9fans-go/acme"
 )
 
@@ -138,6 +139,23 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	}
 	cmd := exec.Command("win", sshCmd...)
 	cmd.Start()
+
+	var (
+		sshwinID   int
+		sshwinName string
+	)
+	for _, winfo := range acme.Windows() {
+		if wininfo.ID > maxid && strings.HasSuffix(wininfo.Name, "-ssh") {
+			sshwinID = winfo.ID
+
+		}
+	}
+	w, err := acme.Open(sshwinID, nil)
+	if err != nil {
+		log.Printf("Could not open window with ssh session due to %s", err)
+	}
+
+	w.Name("/ssh/%s", ssh.Config)
 	cmd.Wait()
 }
 
