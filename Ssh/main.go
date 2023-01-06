@@ -152,7 +152,8 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	if err != nil {
 		log.Printf("Could not open window with ssh session due to %s", err)
 	} else {
-		w.Name("/ssh/%s", sshConfig)
+		winnameSuf := strings.ReplaceAll(sshConfig, "/", "!")
+		w.Name("+Ssh@%s", winnameSuf)
 	}
 	cmd.Wait()
 }
