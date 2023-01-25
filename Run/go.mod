@@ -1,4 +1,4 @@
-module pedrolorgaramos.win/go/acme-cmd/Run
+module plramos.win/acme-cmd/Run
 
 go 1.19
 

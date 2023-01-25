@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"pedrolorgaramos.win/go/9fans/acme"
+	"plramos.win/9fans/acme"
 )
 
 func usage() {

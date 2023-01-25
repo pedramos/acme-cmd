@@ -1,4 +1,4 @@
-module pedrolorgaramos.win/go/acme-cmd/Spell
+module plramos.win/acme-cmd/Spell
 
 go 1.19
 
