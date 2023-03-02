@@ -12,7 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"pedrolorgaramos.win/s/9fans-go/acme"
+	"plramos.win/9fans/acme"
 )
 
 // TODO: add slang env variable to select language to spell
