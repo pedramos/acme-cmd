@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/trustmaster/go-aspell"
 	"log"
 	"os"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/trustmaster/go-aspell"
 	"plramos.win/9fans/acme"
 )
 
