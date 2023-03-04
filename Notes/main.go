@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"sync"
@@ -153,7 +154,7 @@ func updateTagIdx(a *KBArticle, idx artIndex) artIndex {
 func parseMeta(kbfs fs.FS, filename string) (*KBArticle, error) {
 	f, err := kbfs.Open(filename)
 	if err != nil {
-		return nil, fmt.Errorf("error in file %s:%w", filename, err)
+		return nil, fmt.Errorf("error in file %s: %w", filename, err)
 	}
 	s := bufio.NewScanner(f)
 	var buff bytes.Buffer
@@ -182,13 +183,14 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg sync.WaitGroup) {
 		log.Fatal(err)
 	}
 	defer win.CloseFiles()
-	win.Name("/n/notes/tags/%s", strings.Join(filter, "/"))
+	winname := fmt.Sprintf("/n/notes/tags/%s", strings.Join(filter, "/"))
+	win.Name(winname)
 	win.Fprintf("body", "%s", tagIdx.Filter(filter))
 	win.Ctl("clean")
 	win.Addr("0,0")
 	win.Ctl("dot=addr")
 	win.Ctl("show")
-	win.Fprintf("tag", "Get New Expand")
+	win.Fprintf("tag", "Get New Pdf Web")
 
 	for e := range win.EventChan() {
 		switch e.C2 {
@@ -198,6 +200,31 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg sync.WaitGroup) {
 				// TODO parse name to filter
 			case "New":
 				// TODO New article
+			case "Pdf":
+				//TODO: Run pandoc
+				_, err := exec.LookPath("pandoc")
+				if err != nil {
+					acme.Errf(winname, "error looking for pandoc: %w", err)
+					continue
+				}
+				tmpf, err := os.CreateTemp("", "anotes-*.pdf")
+				if err != nil {
+					acme.Errf(winname, "Could not create tmp file: %v", err)
+					continue
+				}
+				outpdf := tmpf.Name()
+				defer os.Remove(outpdf)
+				cmd := exec.Command("pandoc", "--pdf-engine", "tectonic", KBDir+"/"+win.Selection(), "-o", outpdf)
+				message, _ := cmd.CombinedOutput()
+				if len(message) > 0 {
+					acme.Errf(winname, "pandoc: %s", string(message))
+				}
+				cmd = exec.Command("plumb", outpdf)
+				message, _ = cmd.CombinedOutput()
+				if len(message) > 0 {
+					acme.Errf(winname, "plumb: %s", string(message))
+				}
+
 			default:
 				win.WriteEvent(e)
 			}
