@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode"
 	"unsafe"
 
 	"golang.org/x/exp/maps"
@@ -138,7 +139,7 @@ func main() {
 	}
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go tagsWinThread(tagIdx, os.Args[1:], wg)
+	go tagsWinThread(tagIdx, os.Args[1:], &wg)
 	wg.Wait()
 }
 
@@ -175,8 +176,7 @@ func parseMeta(kbfs fs.FS, filename string) (*KBArticle, error) {
 	return a, nil
 }
 
-func tagsWinThread(tagIdx artIndex, filter []string, wg sync.WaitGroup) {
-	wg.Add(1)
+func tagsWinThread(tagIdx artIndex, filter []string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	win, err := acme.New()
 	if err != nil {
@@ -184,24 +184,35 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg sync.WaitGroup) {
 	}
 	defer win.CloseFiles()
 	winname := fmt.Sprintf("/n/notes/tags/%s", strings.Join(filter, "/"))
+	win.Fprintf("tag", "Get New Pdf Web")
+// REDRAW:
 	win.Name(winname)
 	win.Fprintf("body", "%s", tagIdx.Filter(filter))
 	win.Ctl("clean")
 	win.Addr("0,0")
 	win.Ctl("dot=addr")
 	win.Ctl("show")
-	win.Fprintf("tag", "Get New Pdf Web")
 
+EVENTLOOP:
 	for e := range win.EventChan() {
 		switch e.C2 {
-		case 'x': // execute in tag
+		case 'x', 'X': // execute in tag
 			switch string(e.Text) {
 			case "Get":
 				// TODO parse name to filter
+// 				winfo, err := win.Info()
+// 				if err != nil {
+// 					log.Fatal(err)
+// 				}
+// 				winname = winfo.Name
+// 				filter = strings.Split(strings.TrimLeft(winname, "/n/notes/tags"), "/")
+// 				log.Printf("%v", winfo.Tag)
+// 				win.Addr(",")
+// 				win.Write("body", []byte{})
+// 				goto REDRAW
 			case "New":
 				// TODO New article
 			case "Pdf":
-				//TODO: Run pandoc
 				_, err := exec.LookPath("pandoc")
 				if err != nil {
 					acme.Errf(winname, "error looking for pandoc: %w", err)
@@ -214,7 +225,12 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg sync.WaitGroup) {
 				}
 				outpdf := tmpf.Name()
 				defer os.Remove(outpdf)
-				cmd := exec.Command("pandoc", "--pdf-engine", "tectonic", KBDir+"/"+win.Selection(), "-o", outpdf)
+				cmd := exec.Command(
+					"pandoc",
+					"--pdf-engine", "tectonic",
+					KBDir+"/"+strings.TrimSpace(win.Selection()),
+					"-o", outpdf,
+				)
 				message, _ := cmd.CombinedOutput()
 				if len(message) > 0 {
 					acme.Errf(winname, "pandoc: %s", string(message))
@@ -224,7 +240,6 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg sync.WaitGroup) {
 				if len(message) > 0 {
 					acme.Errf(winname, "plumb: %s", string(message))
 				}
-
 			default:
 				win.WriteEvent(e)
 			}
@@ -245,19 +260,54 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg sync.WaitGroup) {
 				newfilter := make([]string, len(filter))
 				copy(newfilter, filter)
 				newfilter = append(newfilter, string(e.Text))
+				wg.Add(1)
 				go tagsWinThread(tagIdx, newfilter, wg)
 				continue
 			}
 			// right click on article name
-			_, error := os.Stat(KBDir + "/" + string(e.Text))
-			if os.IsNotExist(error) {
-				win.WriteEvent(e)
-			} else {
-				// TODO open windows with article
+			var (
+				filename string
+				path     string
+				q0       int = e.Q0
+				q1       int = e.Q1
+			)
+			for {
+				win.Addr("#%d,#%d", q0, q1)
+				b, _ := win.ReadAll("xdata")
+				xdata := []rune(string(b))
+				filename = strings.TrimSpace(string(b))
+				path = KBDir + "/" + filename
+				_, error := os.Stat(path)
+				if os.IsNotExist(error) {
+					if win.Selection() != "" {
+						win.WriteEvent(e)
+						continue EVENTLOOP
+					}
+					if !unicode.IsSpace(xdata[0]) {
+						q0--
+						continue
+					}
+					r := xdata[len(xdata)-1]
+					if !unicode.IsSpace(r) {
+						q1++
+						continue
+					}
+					win.WriteEvent(e)
+					continue EVENTLOOP
+				} else {
+
+					break
+				}
 			}
-
-			win.WriteEvent(e)
-
+			cmd := exec.Command(
+				"plumb",
+				"-d", "edit",
+				path,
+			)
+			message, _ := cmd.CombinedOutput()
+			if len(message) > 0 {
+				acme.Errf(winname, "plumb: %s", string(message))
+			}
 		default:
 			win.WriteEvent(e)
 		}
