@@ -13,11 +13,16 @@ import (
 	"sync"
 	"unicode"
 	"unsafe"
+	_ "embed"
 
 	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v3"
 	"plramos.win/9fans/acme"
 )
+
+//go:embed plr.latex
+var templatedata []byte
+
 
 var KBDir = os.Getenv("kbstore")
 
@@ -213,9 +218,17 @@ EVENTLOOP:
 			case "New":
 				// TODO New article
 			case "Pdf":
+				tmpdir := os.TempDir()
+				templatefile := tmpdir + "/" + "plr.latex"
+				_, error := os.Stat(templatefile)
+				if os.IsNotExist(error) {
+					if err := os.WriteFile(templatefile, templatedata, 0777); err != nil {
+						log.Fatalf("Could not save template: %v", err)
+					}
+				}
 				_, err := exec.LookPath("pandoc")
 				if err != nil {
-					acme.Errf(winname, "error looking for pandoc: %w", err)
+					acme.Errf(winname, "error looking for pandoc: %v", err)
 					continue
 				}
 				filetorender := strings.TrimSpace(win.Selection())
@@ -228,7 +241,8 @@ EVENTLOOP:
 				defer os.Remove(outpdf)
 				cmd := exec.Command(
 					"pandoc",
-					"--pdf-engine", "tectonic",
+					"--pdf-engine", "tectonic", "--toc",
+					"--template", templatefile, "--listings",
 					KBDir+"/"+filetorender,
 					"-o", outpdf,
 				)
