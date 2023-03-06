@@ -1,4 +1,4 @@
-module Notes
+module plramos.win/acme-cmd/Notes
 
 go 1.20
 
