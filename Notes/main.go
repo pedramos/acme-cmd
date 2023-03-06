@@ -3,17 +3,18 @@ package main
 import (
 	"bufio"
 	"bytes"
+	_ "embed"
 	"fmt"
 	"io/fs"
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"sort"
 	"strings"
 	"sync"
 	"unicode"
 	"unsafe"
-	_ "embed"
 
 	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v3"
@@ -22,7 +23,6 @@ import (
 
 //go:embed plr.latex
 var templatedata []byte
-
 
 var KBDir = os.Getenv("kbstore")
 
@@ -188,9 +188,9 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg *sync.WaitGroup) {
 		log.Fatal(err)
 	}
 	defer win.CloseFiles()
-	winname := fmt.Sprintf("/n/notes/tags/%s", strings.Join(filter, "/"))
+	winname := fmt.Sprintf("/n/notes/tags/%s", path.Join(filter...))
 	win.Fprintf("tag", "Get New Pdf Web")
-	// REDRAW:
+REDRAW:
 	win.Name(winname)
 	win.Fprintf("body", "%s", tagIdx.Filter(filter))
 	win.Ctl("clean")
@@ -205,26 +205,28 @@ EVENTLOOP:
 			switch string(e.Text) {
 			case "Get":
 				// TODO parse name to filter
-				// 				winfo, err := win.Info()
-				// 				if err != nil {
-				// 					log.Fatal(err)
-				// 				}
-				// 				winname = winfo.Name
-				// 				filter = strings.Split(strings.TrimLeft(winname, "/n/notes/tags"), "/")
-				// 				log.Printf("%v", winfo.Tag)
-				// 				win.Addr(",")
-				// 				win.Write("body", []byte{})
-				// 				goto REDRAW
+				winfo, err := win.Info()
+				if err != nil {
+					log.Fatal(err)
+				}
+				winname = winfo.Name
+				filter = strings.Split(strings.TrimLeft(winname, "/n/notes/tags"), "/")
+				log.Printf("%v", winfo.Tag)
+				win.Addr(",")
+				win.Write("body", []byte{})
+				goto REDRAW
+
 			case "New":
 				// TODO New article
 			case "Pdf":
 				tmpdir := os.TempDir()
-				templatefile := tmpdir + "/" + "plr.latex"
+				templatefile := path.Join(tmpdir, "plr.latex")
 				_, error := os.Stat(templatefile)
 				if os.IsNotExist(error) {
-					if err := os.WriteFile(templatefile, templatedata, 0777); err != nil {
+					if err := os.WriteFile(templatefile, templatedata, 0666); err != nil {
 						log.Fatalf("Could not save template: %v", err)
 					}
+					defer os.Remove(templatefile)
 				}
 				_, err := exec.LookPath("pandoc")
 				if err != nil {
@@ -243,7 +245,7 @@ EVENTLOOP:
 					"pandoc",
 					"--pdf-engine", "tectonic", "--toc",
 					"--template", templatefile, "--listings",
-					KBDir+"/"+filetorender,
+					path.Join(KBDir, filetorender),
 					"-o", outpdf,
 				)
 				message, _ := cmd.CombinedOutput()
@@ -271,10 +273,9 @@ EVENTLOOP:
 				defer os.Remove(outfile)
 				cmd := exec.Command(
 					"pandoc",
-					KBDir+"/"+filetorender,
+					path.Join(KBDir, filetorender),
 					"-o", outfile,
 				)
-				log.Println(outfile)
 				message, _ := cmd.CombinedOutput()
 				if len(message) > 0 {
 					acme.Errf(winname, "pandoc: %s", string(message))
@@ -310,8 +311,7 @@ EVENTLOOP:
 			}
 			// right click on article name
 			var (
-				filename string
-				path     string
+				fpath    string
 				q0       int = e.Q0
 				q1       int = e.Q1
 			)
@@ -319,9 +319,8 @@ EVENTLOOP:
 				win.Addr("#%d,#%d", q0, q1)
 				b, _ := win.ReadAll("xdata")
 				xdata := []rune(string(b))
-				filename = strings.TrimSpace(string(b))
-				path = KBDir + "/" + filename
-				_, error := os.Stat(path)
+				fpath = path.Join(KBDir, strings.TrimSpace(string(b)))
+				_, error := os.Stat(fpath)
 				if os.IsNotExist(error) {
 					if win.Selection() != "" {
 						win.WriteEvent(e)
@@ -346,7 +345,7 @@ EVENTLOOP:
 			cmd := exec.Command(
 				"plumb",
 				"-d", "edit",
-				path,
+				fpath,
 			)
 			message, _ := cmd.CombinedOutput()
 			if len(message) > 0 {
@@ -364,7 +363,6 @@ func articleWinThread(path string, tag string) {
 	}
 	defer win.CloseFiles()
 	win.Name("", KBDir)
-	win.Fprintf("body", "lol")
 	win.Ctl("clean")
 	win.Addr("0,0")
 	win.Ctl("dot=addr")
