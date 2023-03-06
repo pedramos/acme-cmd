@@ -190,31 +190,28 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg *sync.WaitGroup) {
 	defer win.CloseFiles()
 	winname := fmt.Sprintf("/n/notes/tags/%s", path.Join(filter...))
 	win.Fprintf("tag", "Get New Pdf Web")
-REDRAW:
 	win.Name(winname)
+Redraw:
 	win.Fprintf("body", "%s", tagIdx.Filter(filter))
 	win.Ctl("clean")
 	win.Addr("0,0")
 	win.Ctl("dot=addr")
 	win.Ctl("show")
 
-EVENTLOOP:
+EventLoop:
 	for e := range win.EventChan() {
 		switch e.C2 {
 		case 'x', 'X': // execute in tag
 			switch string(e.Text) {
 			case "Get":
-				// TODO parse name to filter
-				winfo, err := win.Info()
+				win.Clear()
+				tag, err := win.ReadAll("tag")
 				if err != nil {
 					log.Fatal(err)
 				}
-				winname = winfo.Name
-				filter = strings.Split(strings.TrimLeft(winname, "/n/notes/tags"), "/")
-				log.Printf("%v", winfo.Tag)
-				win.Addr(",")
-				win.Write("body", []byte{})
-				goto REDRAW
+				winname = strings.Split(string(tag), " Del")[0]
+				filter = strings.Split(strings.TrimPrefix(winname, "/n/notes/tags/"), "/")
+				goto Redraw
 
 			case "New":
 				// TODO New article
@@ -311,9 +308,9 @@ EVENTLOOP:
 			}
 			// right click on article name
 			var (
-				fpath    string
-				q0       int = e.Q0
-				q1       int = e.Q1
+				fpath string
+				q0    int = e.Q0
+				q1    int = e.Q1
 			)
 			for {
 				win.Addr("#%d,#%d", q0, q1)
@@ -324,7 +321,7 @@ EVENTLOOP:
 				if os.IsNotExist(error) {
 					if win.Selection() != "" {
 						win.WriteEvent(e)
-						continue EVENTLOOP
+						continue EventLoop
 					}
 					if !unicode.IsSpace(xdata[0]) {
 						q0--
@@ -336,7 +333,7 @@ EVENTLOOP:
 						continue
 					}
 					win.WriteEvent(e)
-					continue EVENTLOOP
+					continue EventLoop
 				} else {
 
 					break
