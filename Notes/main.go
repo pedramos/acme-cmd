@@ -185,7 +185,7 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg *sync.WaitGroup) {
 	defer win.CloseFiles()
 	winname := fmt.Sprintf("/n/notes/tags/%s", strings.Join(filter, "/"))
 	win.Fprintf("tag", "Get New Pdf Web")
-// REDRAW:
+	// REDRAW:
 	win.Name(winname)
 	win.Fprintf("body", "%s", tagIdx.Filter(filter))
 	win.Ctl("clean")
@@ -200,16 +200,16 @@ EVENTLOOP:
 			switch string(e.Text) {
 			case "Get":
 				// TODO parse name to filter
-// 				winfo, err := win.Info()
-// 				if err != nil {
-// 					log.Fatal(err)
-// 				}
-// 				winname = winfo.Name
-// 				filter = strings.Split(strings.TrimLeft(winname, "/n/notes/tags"), "/")
-// 				log.Printf("%v", winfo.Tag)
-// 				win.Addr(",")
-// 				win.Write("body", []byte{})
-// 				goto REDRAW
+				// 				winfo, err := win.Info()
+				// 				if err != nil {
+				// 					log.Fatal(err)
+				// 				}
+				// 				winname = winfo.Name
+				// 				filter = strings.Split(strings.TrimLeft(winname, "/n/notes/tags"), "/")
+				// 				log.Printf("%v", winfo.Tag)
+				// 				win.Addr(",")
+				// 				win.Write("body", []byte{})
+				// 				goto REDRAW
 			case "New":
 				// TODO New article
 			case "Pdf":
@@ -218,7 +218,8 @@ EVENTLOOP:
 					acme.Errf(winname, "error looking for pandoc: %w", err)
 					continue
 				}
-				tmpf, err := os.CreateTemp("", "anotes-*.pdf")
+				filetorender := strings.TrimSpace(win.Selection())
+				tmpf, err := os.CreateTemp("", "anotes-*-"+filetorender+".pdf")
 				if err != nil {
 					acme.Errf(winname, "Could not create tmp file: %v", err)
 					continue
@@ -228,7 +229,7 @@ EVENTLOOP:
 				cmd := exec.Command(
 					"pandoc",
 					"--pdf-engine", "tectonic",
-					KBDir+"/"+strings.TrimSpace(win.Selection()),
+					KBDir+"/"+filetorender,
 					"-o", outpdf,
 				)
 				message, _ := cmd.CombinedOutput()
@@ -236,6 +237,35 @@ EVENTLOOP:
 					acme.Errf(winname, "pandoc: %s", string(message))
 				}
 				cmd = exec.Command("plumb", outpdf)
+				message, _ = cmd.CombinedOutput()
+				if len(message) > 0 {
+					acme.Errf(winname, "plumb: %s", string(message))
+				}
+			case "Web":
+				_, err := exec.LookPath("pandoc")
+				if err != nil {
+					acme.Errf(winname, "error looking for pandoc: %w", err)
+					continue
+				}
+				filetorender := strings.TrimSpace(win.Selection())
+				tmpf, err := os.CreateTemp("", "anotes-*-"+filetorender+".html")
+				if err != nil {
+					acme.Errf(winname, "Could not create tmp file: %v", err)
+					continue
+				}
+				outfile := tmpf.Name()
+				defer os.Remove(outfile)
+				cmd := exec.Command(
+					"pandoc",
+					KBDir+"/"+filetorender,
+					"-o", outfile,
+				)
+				log.Println(outfile)
+				message, _ := cmd.CombinedOutput()
+				if len(message) > 0 {
+					acme.Errf(winname, "pandoc: %s", string(message))
+				}
+				cmd = exec.Command("plumb", "-d", "web", outfile)
 				message, _ = cmd.CombinedOutput()
 				if len(message) > 0 {
 					acme.Errf(winname, "plumb: %s", string(message))
