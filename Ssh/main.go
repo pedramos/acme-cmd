@@ -13,7 +13,7 @@
 // Only one of key or password is needed. Password is simply a flag to indicate that the password should be asked.
 //
 // By default the files will be located in $home/lib/coms/ssh
-package main
+package main // plramos.win/acme-cmd/Ssh
 
 import (
 	"bufio"
@@ -154,6 +154,7 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	} else {
 		winnameSuf := strings.ReplaceAll(sshConfig, "/", "!")
 		w.Name("+Ssh@%s", winnameSuf)
+		defer w.Ctl("clean")
 	}
 	cmd.Wait()
 }
