@@ -154,7 +154,10 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	} else {
 		winnameSuf := strings.ReplaceAll(sshConfig, "/", "!")
 		w.Name("+Ssh@%s", winnameSuf)
+		
 		defer w.Ctl("clean")
+		defer w.Fprintf("body", "--SSH TERMINATED--\n")
+		
 	}
 	cmd.Wait()
 }
