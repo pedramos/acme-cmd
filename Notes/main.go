@@ -88,6 +88,11 @@ func (idx artIndex) AllArticles() []*KBArticle {
 }
 
 func (idx artIndex) Filter(tags []string) artIndex {
+	for i := range tags {
+		if tags[i] == "" {
+			tags = append(tags[:i], tags[i+1:]...)
+		}
+	}
 	if len(tags) == 0 {
 		return idx
 	}
@@ -192,6 +197,7 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg *sync.WaitGroup) {
 	win.Fprintf("tag", "Get New Pdf Web")
 	win.Name(winname)
 Redraw:
+	win.Clear()
 	win.Fprintf("body", "%s", tagIdx.Filter(filter))
 	win.Ctl("clean")
 	win.Addr("0,0")
@@ -204,7 +210,6 @@ EventLoop:
 		case 'x', 'X': // execute in tag
 			switch string(e.Text) {
 			case "Get":
-				win.Clear()
 				tag, err := win.ReadAll("tag")
 				if err != nil {
 					log.Fatal(err)
@@ -212,7 +217,6 @@ EventLoop:
 				winname = strings.Split(string(tag), " Del")[0]
 				filter = strings.Split(strings.TrimPrefix(winname, "/n/notes/tags/"), "/")
 				goto Redraw
-
 			case "New":
 				// TODO New article
 			case "Pdf":
