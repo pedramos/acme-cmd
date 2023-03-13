@@ -198,6 +198,7 @@ func tagsWinThread(tagIdx artIndex, filter []string, wg *sync.WaitGroup) {
 	win.Name(winname)
 Redraw:
 	win.Clear()
+	win.Fprintf("body", "kbstore = %s\n-------\n\n", KBDir)
 	win.Fprintf("body", "%s", tagIdx.Filter(filter))
 	win.Ctl("clean")
 	win.Addr("0,0")
@@ -290,6 +291,10 @@ EventLoop:
 				win.WriteEvent(e)
 			}
 		case 'L':
+			if _, err := os.Stat(string(e.Text)); !os.IsNotExist(err) {
+				win.WriteEvent(e)
+				continue				
+			}
 			// right click on article tag
 			var wq0 int
 			if e.Q0 == 0 {
