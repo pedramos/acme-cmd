@@ -1,14 +1,14 @@
 // Ssh cmd is meant to be used inside acme. It manages ssh connections to other systems.
 // Each connection must be described in a configuration file with the following template:
 //
-// 	Info about server
-// 	blah blah
-// 	--end--
+//	Info about server
+//	blah blah
+//	--end--
 //
-// 	host <ip|fqdn>
-// 	user <user>
-// 	password
-// 	key <path to keyfile>
+//	host <ip|fqdn>
+//	user <user>
+//	password
+//	key <path to keyfile>
 //
 // Only one of key or password is needed. Password is simply a flag to indicate that the password should be asked.
 //
@@ -46,7 +46,7 @@ type Server struct {
 
 func main() {
 	w, _ := acme.New()
-	w.Name("/ssh/+list")
+	w.Name("/n/ssh/+list")
 	w.Fprintf("tag", "Get Dial Info Add Mnt")
 	fileSystem := os.DirFS(*sshDir)
 	writeSshEntries(w, fileSystem)
@@ -139,7 +139,7 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	}
 	cmd := exec.Command("win", sshCmd...)
 	cmd.Start()
-	time.Sleep(500 * time.Millisecond        )
+	time.Sleep(500 * time.Millisecond)
 	var sshwinID int
 	wins, _ := acme.Windows()
 	for _, winfo := range wins {
@@ -152,19 +152,17 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	if err != nil {
 		log.Printf("Could not open window with ssh session due to %s", err)
 	} else {
-		winnameSuf := strings.ReplaceAll(sshConfig, "/", "!")
-		w.Name("+Ssh@%s", winnameSuf)
-		
+		w.Name("/n/ssh/%s/+win", sshConfig)
 		defer w.Ctl("clean")
 		defer w.Fprintf("body", "--SSH TERMINATED--\n")
-		
+
 	}
 	cmd.Wait()
 }
 
 func displayInfo(f fs.File, path string) error {
 	w, _ := acme.New()
-	w.Name(fmt.Sprintf("/ssh/%s/+info", path))
+	w.Name(fmt.Sprintf("/n/ssh/%s/+info", path))
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
