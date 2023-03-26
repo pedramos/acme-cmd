@@ -3,23 +3,34 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"fmt"
+	"io"
 	"log"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
-	"github.com/trustmaster/go-aspell"
 	"plramos.win/9fans/acme"
 )
 
-// TODO: add slang env variable to select language to spell
+// TODO:
+// 	+ add slang env variable to select language to spell
+// 	+ add filters like latex and markdown
+// 	+ Show commnand?
 
 var DocID = os.Getenv("winid")
 
+type misspell struct {
+	word       string
+	wincontent string
+	q0, q1     int
+}
+
 func main() {
+	var err error
+	var misspells []misspell
+
 	id, _ := strconv.Atoi(DocID)
 	windoc, _ := acme.Open(id, nil)
 	if windoc == nil {
@@ -33,127 +44,155 @@ func main() {
 		docname = strings.Fields(string(t))[0]
 	}
 
-	q0, _, err := windoc.SelectionAddr()
+	offset, _, err := windoc.SelectionAddr()
 
-	winspell, err := acme.New()
-	if err != nil {
-		log.Fatalf("Could not open new acme window: %v", err)
-	}
-	winspell.Name(fmt.Sprintf("%s+Spell", docname))
-	winspell.Ctl("cleartag")
-	winspell.Write("tag", []byte(" Next Previous Fix"))
-	winspell.Ctl("clean")
-
-	xdata, err := windoc.ReadAll("xdata")
+	courpusraw := windoc.Selection()
 	if err != nil {
 		log.Fatalf("Could not read content: %v", err)
 	}
 
-	r := bytes.NewReader(xdata)
-	windoc, _ = acme.Open(id, nil)
-	if windoc == nil {
-		log.Fatalf("Not running in acme")
+	cmd := exec.Command("aspell", "-a")
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+	go func() {
+		defer stdin.Close()
+		io.WriteString(stdin, string(courpusraw))
+	}()
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	var (
-		// wq0 and wq1 marks the start and end of the word to be spellchecked
-		wq0 int = q0
-		wq1 int = q0
+	br := bytes.NewReader(out)
+	aspellout := bufio.NewScanner(br)
 
-		// word is the buffer which will contain the full word to be spellchecked
-		word strings.Builder
+	sr := strings.NewReader(courpusraw)
+	courpus := bufio.NewScanner(sr)
+	courpus.Scan()
 
-		// scanner goes through xdata. It reads rune by rune
-		scanner *bufio.Scanner = bufio.NewScanner(r)
-	)
+	qconsumed := 0
 
-	scanner.Split(bufio.ScanRunes)
-	for scanner.Scan() {
-		r, _ := utf8.DecodeRune(scanner.Bytes())
-		if r != '-' && (unicode.IsSpace(r) || unicode.IsPunct(r)) {
-			// This only happens if text starts with space
-			if word.Len() == 0 {
-				wq1++
-				wq0 = wq1
-				continue
-			}
-			if err := windoc.Addr("#%d,#%d", wq0, wq1); err != nil {
-				log.Fatalf("Error setting addr: %v", err)
-			}
-			windoc.Ctl("dot=addr")
-			if fixedWrd, deltaQ := spellcheck(winspell, word.String()); !(fixedWrd == "" && deltaQ == 0) {
-				windoc.Write("data", []byte(fixedWrd))
-				wq1 += deltaQ
-			}
-			word.Reset()
-
-			wq1++
-			wq0 = wq1
+	aspellout.Scan() // discard first output line
+	for aspellout.Scan() {
+		// empty line
+		if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '\n' {
+			continue
 		}
-		if unicode.IsLetter(r) || r == '-' {
-			word.WriteRune(r)
-			wq1++
+		// new line
+		if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '*' {
+			qconsumed += len(courpus.Text()) + 1
+
+			for courpus.Scan() && len(courpus.Text()) == 0 {
+				qconsumed++
+			}
+			continue
+		}
+		// wrong word with suggestions
+		if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '&' {
+			info, corrections, _ := strings.Cut(aspellout.Text(), ":")
+
+			word := strings.Split(info, " ")[1]
+			qstr := strings.Split(info, " ")[3]
+			q0, err := strconv.Atoi(qstr)
+			if err != nil {
+				log.Fatalf("invalid address from aspell")
+			}
+
+			misspells = append(misspells, misspell{
+				word:       word,
+				wincontent: "> " + word + "\n" + strings.ReplaceAll(corrections, ", ", "\n"),
+				q0:         q0 + offset + qconsumed,
+				q1:         q0 + offset + qconsumed + len(word),
+			})
+		}
+		// error but no suggestion
+		if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '#' {
+			word := strings.Split(aspellout.Text(), " ")[1]
+			qstr := strings.Split(aspellout.Text(), " ")[2]
+			q0, err := strconv.Atoi(qstr)
+			if err != nil {
+				log.Fatalf("invalid address from aspell")
+			}
+			misspells = append(misspells, misspell{
+				word:       word,
+				wincontent: "> " + word + "\n~no corrections~",
+				q0:         q0 + offset + qconsumed,
+				q1:         q0 + offset + qconsumed + len(word),
+			})
+			continue
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		log.Fatalf("Failed to read word")
-	}
-	if fixedWrd, deltaQ := spellcheck(winspell, word.String()); !(fixedWrd == "" && deltaQ == 0) {
-		if err := windoc.Addr("#%d,#%d", wq0, wq1); err != nil {
-			log.Fatalf("Error setting addr: %v", err)
+	// dummy correction to prevent program exit
+	misspells = append(misspells, misspell{
+		word:       "",
+		wincontent: "~Done~",
+		q0:         offset,
+		q1:         offset + len(courpusraw),
+	})
+	wspell, _ := acme.New()
+	wspell.Name(docname + "+corrections")
+	wspell.Ctl("cleartag")
+	wspell.Fprintf("tag", " Next Previous Fix")
+
+NextWord:
+	for i := 0; i < len(misspells); i++ {
+		if i < 0 {
+			i = 0
 		}
-		windoc.Write("data", []byte(fixedWrd))
+		wspell.Clear()
+		wspell.Fprintf("body", misspells[i].wincontent)
+		wspell.Ctl("clean")
+		wspell.Addr("0,0")
+		wspell.Ctl("dot=addr")
+		wspell.Ctl("show")
+		if misspells[i].q1 > len(courpusraw) {
+			log.Fatal("upsy: out of range")
+		}
+		windoc.Addr("#%d,#%d", misspells[i].q0, misspells[i].q1)
+		windoc.Ctl("dot=addr")
+		for e := range wspell.EventChan() {
+			switch e.C2 {
+			case 'x': // execute in tag
+				if string(e.Text) == "Next" {
+					continue NextWord
+				}
+				if string(e.Text) == "Fix" {
+					fixedWrd := strings.TrimSpace(wspell.Selection())
+					windoc.Fprintf("data", fixedWrd)
+					FixPositions(misspells, i, len(fixedWrd)-len(misspells[i].word))
+					continue NextWord
+				}
+				if string(e.Text) == "Previous" {
+					i -= 2
+					continue NextWord
+				}
+				if string(e.Text) == "Del" {
+					os.Exit(0)
+				}
+				wspell.WriteEvent(e)
+			case 'X':
+				fixedWrd := strings.TrimSpace(wspell.Selection())
+				windoc.Fprintf("data", fixedWrd)
+				FixPositions(misspells, i, len(fixedWrd)-len(misspells[i].word))
+				continue NextWord
+			default:
+				wspell.WriteEvent(e)
+			}
+		}
 	}
-	winspell.Del(true)
 }
 
-func spellcheck(w *acme.Win, word string) (fixedWrd string, deltaQ int) {
-	w.Addr(",")
-	w.Write("data", nil)
-	w.Ctl("clean")
-
-	speller, err := aspell.NewSpeller(map[string]string{
-		"lang": "en_US",
-	})
-	if err != nil {
-		log.Fatalf("could not open speller: %v", err)
-	}
-	defer speller.Delete()
-
-	w.Fprintf("body", "> %s\n", word)
-	w.Ctl("clean")
-
-	var sugglst []string
-	if speller.Check(word) {
+func FixPositions(misspells []misspell, start int, delta int) {
+	if delta == 0 {
 		return
-	} else if len(speller.Suggest(word)) < 5 {
-		sugglst = speller.Suggest(word)
-	} else {
-		sugglst = speller.Suggest(word)[:5]
 	}
-
-	w.Fprintf("body", "%s\n", strings.Join(sugglst, "\n"))
-	w.Ctl("clean")
-	for e := range w.EventChan() {
-		switch e.C2 {
-		case 'x': // execute in tag
-			if string(e.Text) == "Next" {
-				return
-			}
-			if string(e.Text) == "Del" {
-				w.Del(true)
-				os.Exit(0)
-			}
-			if string(e.Text) == "Fix" {
-				fixedWrd = strings.TrimSpace(w.Selection())
-				deltaQ = len(fixedWrd) - len(word)
-				return
-			}
-		case 'X':
-			fixedWrd = strings.TrimSpace(string(e.Text))
-			deltaQ = len(fixedWrd) - len(word)
-			return
-		}
+	misspells[start].q1 += delta
+	start++
+	for i := start; i < len(misspells); i++ {
+		misspells[i].q0 += delta
+		misspells[i].q1 += delta
 	}
-	return
 }
