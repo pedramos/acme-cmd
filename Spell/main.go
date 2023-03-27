@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -28,8 +29,11 @@ type misspell struct {
 }
 
 func main() {
-	var err error
-	var misspells []misspell
+	var (
+		err       error
+		misspells []misspell // contains all misspelled words and their location
+		docname   string     // docpath
+	)
 
 	id, _ := strconv.Atoi(DocID)
 	windoc, _ := acme.Open(id, nil)
@@ -37,21 +41,39 @@ func main() {
 		log.Fatalf("Not running in acme")
 	}
 
-	var docname string
+	// BUG: What if name contains spaces?
 	if t, err := windoc.ReadAll("tag"); err != nil || t[0] == ' ' {
 		docname = ""
 	} else {
 		docname = strings.Fields(string(t))[0]
 	}
 
+	aspellMode := "--mode="
+	switch filepath.Ext(docname) {
+	case ".tex":
+		aspellMode += "tex"
+	case ".md":
+		aspellMode += "markdown"
+	case ".ms":
+		aspellMode += "nroff"
+	case ".html":
+		aspellMode += "html"
+	default:
+		aspellMode = ""
+	}
 	offset, _, err := windoc.SelectionAddr()
-
-	courpusraw := windoc.Selection()
 	if err != nil {
 		log.Fatalf("Could not read content: %v", err)
 	}
 
-	cmd := exec.Command("aspell", "-a")
+	courpusraw := windoc.Selection()
+	if courpusraw == "" {
+		offset = 0
+		windoc.Addr("0,$")
+		b, _ := windoc.ReadAll("xdata")
+		courpusraw = string(b)
+	}
+	cmd := exec.Command("aspell", "-a", aspellMode)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		log.Fatal(err)
