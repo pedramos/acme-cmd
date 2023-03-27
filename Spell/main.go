@@ -73,79 +73,75 @@ func main() {
 		b, _ := windoc.ReadAll("xdata")
 		courpusraw = string(b)
 	}
-	cmd := exec.Command("aspell", "-a", aspellMode)
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		log.Fatal(err)
-	}
-	go func() {
-		defer stdin.Close()
-		io.WriteString(stdin, string(courpusraw))
-	}()
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	br := bytes.NewReader(out)
-	aspellout := bufio.NewScanner(br)
 
 	sr := strings.NewReader(courpusraw)
 	courpus := bufio.NewScanner(sr)
-	courpus.Scan()
 
 	qconsumed := 0
-
-	aspellout.Scan() // discard first output line
-	for aspellout.Scan() {
-		// empty line
-		if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '\n' {
-			continue
+	for courpus.Scan() {
+		cmd := exec.Command("aspell", "-a", aspellMode)
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			log.Fatal(err)
 		}
-		// new line
-		if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '*' {
-			qconsumed += len(courpus.Text()) + 1
+		go func() {
+			defer stdin.Close()
+			io.WriteString(stdin, courpus.Text())
+		}()
 
-			for courpus.Scan() && len(courpus.Text()) == 0 {
-				qconsumed++
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Fatal(err)
+		}
+		br := bytes.NewReader(out)
+		aspellout := bufio.NewScanner(br)
+		aspellout.Scan() // discard first output line
+		for aspellout.Scan() {
+			// empty line
+			if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '\n' {
+				continue
 			}
-			continue
-		}
-		// wrong word with suggestions
-		if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '&' {
-			info, corrections, _ := strings.Cut(aspellout.Text(), ":")
-
-			word := strings.Split(info, " ")[1]
-			qstr := strings.Split(info, " ")[3]
-			q0, err := strconv.Atoi(qstr)
-			if err != nil {
-				log.Fatalf("invalid address from aspell")
+			// new line
+			if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '*' {
+				continue
 			}
 
-			misspells = append(misspells, misspell{
-				word:       word,
-				wincontent: "> " + word + "\n" + strings.ReplaceAll(corrections, ", ", "\n"),
-				q0:         q0 + offset + qconsumed,
-				q1:         q0 + offset + qconsumed + len(word),
-			})
-		}
-		// error but no suggestion
-		if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '#' {
-			word := strings.Split(aspellout.Text(), " ")[1]
-			qstr := strings.Split(aspellout.Text(), " ")[2]
-			q0, err := strconv.Atoi(qstr)
-			if err != nil {
-				log.Fatalf("invalid address from aspell")
+			// wrong word with suggestions
+			if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '&' {
+				info, corrections, _ := strings.Cut(aspellout.Text(), ":")
+
+				word := strings.Split(info, " ")[1]
+				qstr := strings.Split(info, " ")[3]
+				q0, err := strconv.Atoi(qstr)
+				if err != nil {
+					log.Fatalf("invalid address from aspell")
+				}
+
+				misspells = append(misspells, misspell{
+					word:       word,
+					wincontent: "> " + word + "\n" + strings.ReplaceAll(corrections, ", ", "\n"),
+					q0:         q0 + offset + qconsumed,
+					q1:         q0 + offset + qconsumed + len(word),
+				})
 			}
-			misspells = append(misspells, misspell{
-				word:       word,
-				wincontent: "> " + word + "\n~no corrections~",
-				q0:         q0 + offset + qconsumed,
-				q1:         q0 + offset + qconsumed + len(word),
-			})
-			continue
+			// error but no suggestion
+			if c, _ := utf8.DecodeRune(aspellout.Bytes()); c == '#' {
+				word := strings.Split(aspellout.Text(), " ")[1]
+				qstr := strings.Split(aspellout.Text(), " ")[2]
+				q0, err := strconv.Atoi(qstr)
+				if err != nil {
+					log.Fatalf("invalid address from aspell")
+				}
+				misspells = append(misspells, misspell{
+					word:       word,
+					wincontent: "> " + word + "\n~no corrections~",
+					q0:         q0 + offset + qconsumed,
+					q1:         q0 + offset + qconsumed + len(word),
+				})
+				continue
+			}
 		}
+		qconsumed += len(courpus.Text()) + 1
 	}
 	// dummy correction to prevent program exit
 	misspells = append(misspells, misspell{
