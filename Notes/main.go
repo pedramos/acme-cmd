@@ -262,7 +262,7 @@ EventLoop:
 			case "Web":
 				_, err := exec.LookPath("pandoc")
 				if err != nil {
-					acme.Errf(winname, "error looking for pandoc: %w", err)
+					acme.Errf(winname, "error looking for pandoc: %v", err)
 					continue
 				}
 				filetorender := strings.TrimSpace(win.Selection())
@@ -368,7 +368,7 @@ func articleWinThread(path string, tag string) {
 		log.Fatal(err)
 	}
 	defer win.CloseFiles()
-	win.Name("", KBDir)
+	win.Name("%s", KBDir)
 	win.Ctl("clean")
 	win.Addr("0,0")
 	win.Ctl("dot=addr")
