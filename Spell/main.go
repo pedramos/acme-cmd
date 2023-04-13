@@ -192,7 +192,7 @@ NextWord:
 				}
 				wspell.WriteEvent(e)
 			case 'X':
-				fixedWrd := strings.TrimSpace(wspell.Selection())
+				fixedWrd := strings.TrimSpace(string(e.Text))
 				windoc.Fprintf("data", fixedWrd)
 				FixPositions(misspells, i, len(fixedWrd)-len(misspells[i].word))
 				continue NextWord
