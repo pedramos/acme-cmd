@@ -150,7 +150,7 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	var sshwinID int
 	wins, _ := acme.Windows()
 	for _, winfo := range wins {
-		if winfo.ID > sshwinID && strings.HasSuffix(winfo.Name, "+sshwin") {
+		if winfo.ID > sshwinID && strings.HasSuffix(winfo.Name, "-ssh") {
 			sshwinID = winfo.ID
 
 		}
