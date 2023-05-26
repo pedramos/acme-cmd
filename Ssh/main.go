@@ -35,8 +35,9 @@ func usage() {
 	os.Exit(2)
 }
 
-var HOME = os.Getenv("HOME")
-var defaultDir = fmt.Sprintf("%s/lib/coms/ssh", HOME)
+var HomeEnv = os.Getenv("HOME")
+var MntEnv = os.Getenv("9MNT")
+var defaultDir = fmt.Sprintf("%s/lib/coms/ssh", HomeEnv)
 var sshDir = flag.String("d", defaultDir, "Directory contianing all the ssh connection description")
 
 type Server struct {
@@ -45,8 +46,11 @@ type Server struct {
 }
 
 func main() {
+	if MntEnv == "" {
+		MntEnv = HomeEnv + "/n"
+	}
 	w, _ := acme.New()
-	w.Name("/n/ssh/+list")
+	w.Name("%s/ssh/+list", MntEnv)
 	w.Fprintf("tag", "Get Dial Info Add Mnt")
 	fileSystem := os.DirFS(*sshDir)
 	writeSshEntries(w, fileSystem)
@@ -82,6 +86,9 @@ func main() {
 			}
 		case 'X': // executes in body
 			dial(w, e, fileSystem)
+		
+		case 'L': // right click on body
+			sshFS(w, e, fileSystem)
 		}
 	}
 }
@@ -143,7 +150,7 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	var sshwinID int
 	wins, _ := acme.Windows()
 	for _, winfo := range wins {
-		if winfo.ID > sshwinID && strings.HasSuffix(winfo.Name, "-ssh") {
+		if winfo.ID > sshwinID && strings.HasSuffix(winfo.Name, "+sshwin") {
 			sshwinID = winfo.ID
 
 		}
@@ -152,7 +159,7 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 	if err != nil {
 		log.Printf("Could not open window with ssh session due to %s", err)
 	} else {
-		w.Name("/n/ssh/%s/+win", sshConfig)
+		w.Name("%s/ssh/win/%s+sh", MntEnv, sshConfig)
 		defer w.Ctl("clean")
 		defer w.Fprintf("body", "--SSH TERMINATED--\n")
 
@@ -162,7 +169,7 @@ func dial(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 
 func displayInfo(f fs.File, path string) error {
 	w, _ := acme.New()
-	w.Name(fmt.Sprintf("/n/ssh/%s/+info", path))
+	w.Name(fmt.Sprintf("%s/ssh/%s/+info", MntEnv, path))
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -177,7 +184,12 @@ func displayInfo(f fs.File, path string) error {
 }
 
 func sshFS(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
-	sshConfig := strings.TrimSpace(string(w.Selection()))
+	var sshConfig string
+	if w.Selection() == "" {
+		sshConfig = strings.TrimSpace(string(e.Text))
+	} else { 
+		sshConfig = strings.TrimSpace(string(w.Selection()))
+	}
 	w.Del(true)
 	f, err := fileSystem.Open(sshConfig)
 	if err != nil {
@@ -189,7 +201,7 @@ func sshFS(w *acme.Win, e *acme.Event, fileSystem fs.FS) {
 		log.Fatal(err)
 	}
 
-	mntPoint := fmt.Sprintf("%s/n/%s", HOME, e.Text)
+	mntPoint := fmt.Sprintf("%s/ssh/fs/%s", MntEnv, sshConfig)
 	os.MkdirAll(mntPoint, 0770)
 	fsCmdArgs := []string{
 		"-C",
