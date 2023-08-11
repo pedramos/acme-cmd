@@ -358,6 +358,7 @@ EventLoop:
 				acme.Errf(winname, "plumb: %s", string(message))
 			} else {
 				win.Del(true)
+				return
 			}
 		default:
 			win.WriteEvent(e)
